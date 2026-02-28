@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galactic Tactics: Seamless Battle Flow</title>
+    <title>Galactic Tactics: Advanced Tactical AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
@@ -35,6 +35,7 @@
             border: 4px solid #333;
             background: #000;
             box-shadow: 0 0 30px rgba(0, 255, 0, 0.15);
+            overflow: hidden;
         }
 
         canvas {
@@ -119,16 +120,6 @@
             opacity: 0.5;
         }
 
-        .btn-roll {
-            background: #444;
-            color: white;
-            border: none;
-            padding: 15px;
-            font-size: 12px;
-            width: 100%;
-            cursor: default;
-        }
-
         .log {
             height: 140px;
             overflow-y: auto;
@@ -147,6 +138,18 @@
             margin-top: 2px;
         }
 
+        #audio-init-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            cursor: pointer;
+        }
+
         .crt::after {
             content: " ";
             display: block;
@@ -161,6 +164,12 @@
 </head>
 <body class="crt">
 
+    <div id="audio-init-overlay" onclick="game.initAudio()">
+        <p class="mb-4">TACTICAL LINK DETECTED</p>
+        <button class="border-2 border-green-500 px-6 py-4 hover:bg-green-500 hover:text-black">INITIALIZE SYSTEMS</button>
+        <p class="mt-4 text-[8px] text-gray-500 text-center px-10">AI PROXIMITY SENSORS & PROACTIVE SHIELDING ACTIVE</p>
+    </div>
+
     <div id="game-wrapper">
         <div id="canvas-container">
             <canvas id="gameCanvas" width="600" height="600"></canvas>
@@ -171,19 +180,19 @@
                 <div class="flex justify-between items-center mb-2">
                     <span id="dice-val" class="text-xl">🎲 ?</span>
                     <div class="text-right">
-                        <span id="turn-indicator" class="text-[7px] text-gray-400 block mb-1">AUTO-SYNC...</span>
-                        <span class="text-[8px] text-gray-500">AP</span><br>
+                        <span id="turn-indicator" class="text-[7px] text-gray-400 block mb-1">WAITING...</span>
+                        <span class="text-[8px] text-gray-500">SQUAD AP</span><br>
                         <span id="ap-val" class="text-white text-lg">0</span>
                     </div>
                 </div>
-                <div class="text-[7px] text-center text-gray-600 mb-1">DICE AUTO-ROLL ON TURN START</div>
+                <div class="text-[7px] text-center text-gray-600 mb-1 uppercase">Phaser Range: 4 Tiles</div>
             </div>
 
             <div class="stat-box">
                 <div class="ship-selector" id="ship-selector"></div>
                 <div id="active-ship-stats" class="text-[9px]">
                     STATUS: [|||] ONLINE <br>
-                    SHIELD: OFF
+                    COMMAND: READY
                 </div>
             </div>
 
@@ -205,7 +214,7 @@
                     <span class="bg-green-900 px-1 text-white">1</span>
                 </button>
                 <button class="btn-action" onclick="game.takeAction('fire')" data-cost="3">
-                    <div>MISSILE<span class="key-hint">[F]</span></div> 
+                    <div>PHASER<span class="key-hint">[F]</span></div> 
                     <span class="bg-green-900 px-1 text-white">3</span>
                 </button>
                 <button class="btn-action" onclick="game.takeAction('shield')" data-cost="2">
@@ -219,28 +228,117 @@
             </div>
             
             <button id="end-turn-btn" class="btn-action" onclick="game.endPlayerTurn()" style="border-color: #ff3333; color: #ff3333; width: 100%;">
-                <span>PASS TURN [SPACE]</span>
+                <span>END TURN [SPACE]</span>
             </button>
 
             <div class="log" id="game-log">
-                Combat Systems Ready.
+                Command Terminal Online.
             </div>
         </div>
     </div>
 
     <script>
+        class AudioManager {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            play(type) {
+                if (!this.ctx) return;
+                const { ctx } = this;
+                
+                switch(type) {
+                    case 'laser':
+                        this._sweep(880, 220, 0.15, 'square', 0.1);
+                        break;
+                    case 'hit':
+                        this._noise(0.1, 0.3);
+                        this._sweep(200, 50, 0.1, 'sawtooth', 0.2);
+                        break;
+                    case 'shield':
+                        this._sweep(110, 880, 0.2, 'sine', 0.1);
+                        break;
+                    case 'dice':
+                        this._sweep(440, 660, 0.05, 'triangle', 0.1);
+                        break;
+                    case 'move':
+                        this._sweep(150, 50, 0.08, 'sawtooth', 0.05);
+                        break;
+                    case 'explosion':
+                        this._noise(0.6, 0.8, 1);
+                        this._sweep(100, 20, 0.4, 'sine', 0.5);
+                        break;
+                }
+            }
+
+            _sweep(startFreq, endFreq, duration, type, volume = 0.2) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(startFreq, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(Math.max(0.1, endFreq), this.ctx.currentTime + duration);
+                gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+
+            _noise(duration, volume, lowPass = 0) {
+                const bufferSize = this.ctx.sampleRate * duration;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                
+                const source = this.ctx.createBufferSource();
+                source.buffer = buffer;
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
+                
+                if (lowPass > 0) {
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(400, this.ctx.currentTime);
+                    source.connect(filter);
+                    filter.connect(gain);
+                } else {
+                    source.connect(gain);
+                }
+                
+                gain.connect(this.ctx.destination);
+                source.start();
+            }
+        }
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const GRID_SIZE = 50;
         const COLS = canvas.width / GRID_SIZE;
         const ROWS = canvas.height / GRID_SIZE;
+        const MAX_RANGE = 4;
 
         class Game {
             constructor() {
                 this.ap = 0;
-                this.turnState = 'PLAYER';
+                this.turnState = 'WAITING';
                 this.animating = false;
+                this.audio = new AudioManager();
+                this.shake = 0;
                 
+                this.stars = Array.from({length: 100}, () => ({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    speed: 0.1 + Math.random() * 0.9,
+                    size: 1 + Math.random() * 2,
+                    color: Math.random() > 0.9 ? '#00ffff' : '#fff'
+                }));
+
                 this.playerShips = [
                     { id: 0, name: 'ALPHA', x: 2, y: 10, angle: 0, hp: 1, shield: false, shieldHp: 2, maxShieldHp: 2, vx: 2, vy: 10, va: 0, pulse: 0 },
                     { id: 1, name: 'BRAVO', x: 6, y: 10, angle: 0, hp: 1, shield: false, shieldHp: 2, maxShieldHp: 2, vx: 6, vy: 10, va: 0, pulse: 0 },
@@ -258,22 +356,23 @@
                 
                 this.setupKeyboard();
                 this.startAnimationLoop();
-                
-                // Start the very first turn
-                setTimeout(() => this.beginPlayerTurn(), 500);
+            }
+
+            initAudio() {
+                this.audio.init();
+                document.getElementById('audio-init-overlay').style.display = 'none';
+                this.beginPlayerTurn();
             }
 
             setupKeyboard() {
                 window.addEventListener('keydown', (e) => {
                     if (this.animating || this.turnState === 'ENEMY') return;
                     const key = e.key.toUpperCase();
-                    
                     if (key === '1') this.selectShip(0);
                     if (key === '2') this.selectShip(1);
                     if (key === '3') this.selectShip(2);
                     if (key === 'H') this.takeAction('repair');
                     if (key === ' ' || key === 'E') this.endPlayerTurn();
-
                     if (this.turnState === 'PLAYER') {
                         if (key === 'W') this.takeAction('moveFwd');
                         if (key === 'S') this.takeAction('moveBack');
@@ -315,10 +414,10 @@
                 });
 
                 const active = this.playerShips[this.selectedShipIndex];
-                const shieldIntegrity = active.hp > 0 ? `${"|".repeat(active.shieldHp)}${".".repeat(active.maxShieldHp - active.shieldHp)}` : "VOID";
+                const shieldIntegrity = active.hp > 0 ? `${"|".repeat(active.shieldHp)}${".".repeat(active.maxShieldHp - active.shieldHp)}` : "OFFLINE";
                 document.getElementById('active-ship-stats').innerHTML = `
                     SHIELD INTEGRITY: [${shieldIntegrity}] <br>
-                    POWER: <span style="color:${active.shield ? '#00ffff' : '#ff3333'}">${active.shield ? 'SHIELDS ACTIVE' : 'SHIELDS OFF'}</span>
+                    COMMAND: <span style="color:${active.shield ? '#00ffff' : '#ff3333'}">${active.shield ? 'SHIELDS ONLINE' : 'READY'}</span>
                 `;
 
                 const actionButtons = document.querySelectorAll('.btn-action');
@@ -326,108 +425,48 @@
                     const cost = parseInt(btn.getAttribute('data-cost')) || 0;
                     btn.disabled = (this.turnState !== 'PLAYER' || this.ap < cost || active.hp <= 0 || this.animating);
                 });
-                
                 document.getElementById('end-turn-btn').disabled = this.turnState !== 'PLAYER' || this.animating;
             }
 
             beginPlayerTurn() {
                 if (this.playerShips.every(s => s.hp <= 0)) return;
-                
                 this.turnState = 'PLAYER';
                 const d1 = Math.floor(Math.random() * 6) + 1;
                 const d2 = Math.floor(Math.random() * 6) + 1;
                 this.ap = d1 + d2;
                 document.getElementById('dice-val').textContent = `🎲 ${d1} + ${d2}`;
-                
-                this.addLog(`Turn Start. Gained ${this.ap} AP.`);
-                
+                this.audio.play('dice');
+                this.addLog(`Systems Online. AP: ${this.ap}`);
                 this.playerShips.forEach(s => {
-                    if (s.shield && s.hp > 0) {
-                        this.ap = Math.max(0, this.ap - 1);
-                        this.addLog(`${s.name} maintenance: -1 AP`);
-                    }
+                    if (s.shield && s.hp > 0) this.ap = Math.max(0, this.ap - 1);
                 });
-
                 this.updateUI();
-
-                if (this.ap <= 0) {
-                    this.addLog("No remaining AP. Switching turn...");
-                    setTimeout(() => this.endPlayerTurn(), 1000);
-                }
+                if (this.ap <= 0) setTimeout(() => this.endPlayerTurn(), 1000);
             }
 
             takeAction(type) {
                 if (this.turnState !== 'PLAYER' || this.animating) return;
                 const ship = this.playerShips[this.selectedShipIndex];
-                
-                const costs = {
-                    'moveFwd': 1,
-                    'moveBack': 2,
-                    'rotL': 1,
-                    'rotR': 1,
-                    'fire': 3,
-                    'shield': 2,
-                    'repair': 4
-                };
-                
+                const costs = { 'moveFwd': 1, 'moveBack': 2, 'rotL': 1, 'rotR': 1, 'fire': 3, 'shield': 2, 'repair': 4 };
                 let cost = costs[type] || 0;
+                if (this.ap < cost) return;
 
-                if (this.ap < cost) {
-                    this.addLog("Insufficient AP!");
-                    return;
-                }
-
-                let actionSucceeded = false;
+                let success = false;
                 const rad = (ship.angle - 90) * (Math.PI / 180);
                 const dx = Math.round(Math.cos(rad));
                 const dy = Math.round(Math.sin(rad));
 
                 switch(type) {
-                    case 'moveFwd':
-                        if (this.canMove(ship.x + dx, ship.y + dy)) { 
-                            ship.x += dx; ship.y += dy; 
-                            actionSucceeded = true;
-                        } else {
-                            this.addLog("Path obstructed!");
-                        }
-                        break;
-                    case 'moveBack':
-                        if (this.canMove(ship.x - dx, ship.y - dy)) { 
-                            ship.x -= dx; ship.y -= dy; 
-                            actionSucceeded = true;
-                        } else {
-                            this.addLog("Path obstructed!");
-                        }
-                        break;
-                    case 'rotL':
-                        ship.angle = (ship.angle - 45 + 360) % 360;
-                        actionSucceeded = true;
-                        break;
-                    case 'rotR':
-                        ship.angle = (ship.angle + 45) % 360;
-                        actionSucceeded = true;
-                        break;
-                    case 'fire':
-                        this.fireWeapon(ship, this.enemyShips, '#00ff00');
-                        actionSucceeded = true;
-                        break;
-                    case 'shield':
-                        ship.shield = !ship.shield;
-                        this.addLog(`${ship.name} shields ${ship.shield ? 'UP' : 'DOWN'}`);
-                        actionSucceeded = true;
-                        break;
-                    case 'repair':
-                        if (ship.shieldHp < ship.maxShieldHp) {
-                            ship.shieldHp++;
-                            this.addLog(`${ship.name} shield repaired.`);
-                            actionSucceeded = true;
-                        } else {
-                            this.addLog("Shield integrity at maximum.");
-                        }
-                        break;
+                    case 'moveFwd': if (this.canMove(ship.x + dx, ship.y + dy)) { ship.x += dx; ship.y += dy; success = true; this.audio.play('move'); } break;
+                    case 'moveBack': if (this.canMove(ship.x - dx, ship.y - dy)) { ship.x -= dx; ship.y -= dy; success = true; this.audio.play('move'); } break;
+                    case 'rotL': ship.angle = (ship.angle - 45 + 360) % 360; success = true; this.audio.play('move'); break;
+                    case 'rotR': ship.angle = (ship.angle + 45) % 360; success = true; this.audio.play('move'); break;
+                    case 'fire': this.fireWeapon(ship, this.enemyShips, '#00ff00'); success = true; break;
+                    case 'shield': ship.shield = !ship.shield; success = true; this.audio.play('shield'); break;
+                    case 'repair': if (ship.shieldHp < ship.maxShieldHp) { ship.shieldHp++; success = true; this.audio.play('shield'); } break;
                 }
 
-                if (actionSucceeded) {
+                if (success) {
                     this.ap -= cost;
                     this.triggerAnimationDelay();
                     this.checkAutoEnd();
@@ -436,25 +475,19 @@
             }
 
             checkAutoEnd() {
-                // If AP is zero, wait for current actions to settle then end turn
                 if (this.ap <= 0) {
-                    const checkInterval = setInterval(() => {
+                    const check = setInterval(() => {
                         if (this.effects.length === 0 && !this.animating) {
-                            clearInterval(checkInterval);
-                            if (this.turnState === 'PLAYER' && this.ap <= 0) {
-                                this.endPlayerTurn();
-                            }
+                            clearInterval(check);
+                            if (this.turnState === 'PLAYER' && this.ap <= 0) this.endPlayerTurn();
                         }
                     }, 500);
                 }
             }
 
-            triggerAnimationDelay(ms = 300) {
+            triggerAnimationDelay(ms = 250) {
                 this.animating = true;
-                setTimeout(() => {
-                    this.animating = false;
-                    this.updateUI();
-                }, ms);
+                setTimeout(() => { this.animating = false; this.updateUI(); }, ms);
             }
 
             canMove(nx, ny) {
@@ -462,143 +495,146 @@
                 return ![...this.playerShips, ...this.enemyShips].some(s => s.hp > 0 && s.x === nx && s.y === ny);
             }
 
-            fireWeapon(source, potentialTargets, color) {
+            fireWeapon(source, targets, color) {
                 const rad = (source.angle - 90) * (Math.PI / 180);
                 const dx = Math.cos(rad);
                 const dy = Math.sin(rad);
-                
                 let hit = null;
-                let targetX = source.x + dx * 12;
-                let targetY = source.y + dy * 12;
+                let tx = source.x + dx * MAX_RANGE, ty = source.y + dy * MAX_RANGE;
 
-                for (let i = 1; i <= 10; i++) {
+                for (let i = 1; i <= MAX_RANGE; i++) {
                     const cx = Math.round(source.x + dx * i);
                     const cy = Math.round(source.y + dy * i);
-                    const enemy = potentialTargets.find(e => e.hp > 0 && e.x === cx && e.y === cy);
-                    if (enemy) {
-                        hit = enemy;
-                        targetX = cx; targetY = cy;
-                        break;
-                    }
+                    const target = targets.find(e => e.hp > 0 && e.x === cx && e.y === cy);
+                    if (target) { hit = target; tx = cx; ty = cy; break; }
                 }
 
+                this.audio.play('laser');
                 this.effects.push({ 
-                    type: 'missile', 
-                    x: source.x, y: source.y, 
-                    tx: targetX, ty: targetY, 
-                    progress: 0, 
-                    color: color,
+                    type: 'beam', x: source.x, y: source.y, tx, ty, color, life: 1.0,
+                    onHitTriggered: false,
                     onHit: () => {
                         if (hit) {
                             if (hit.shield && hit.shieldHp > 0) {
                                 hit.shieldHp--;
-                                this.addLog(`${hit.name} shield damaged!`);
+                                this.audio.play('hit');
+                                this.shake = 5;
                                 if (hit.shieldHp <= 0) {
                                     hit.shield = false;
-                                    this.addLog(`${hit.name} SHIELDS COLLAPSED!`);
                                 }
                             } else {
                                 hit.hp = 0;
-                                this.addLog(`${hit.name} DESTROYED!`);
+                                this.audio.play('explosion');
+                                this.triggerExplosion(hit.x, hit.y);
+                                this.shake = 15;
+                                this.addLog(`${hit.name} NEUTRALIZED!`);
                             }
-                        } else {
-                            this.addLog(`${source.name} fire missed.`);
                         }
                     }
                 });
+            }
+
+            triggerExplosion(x, y) {
+                for(let i=0; i<25; i++) {
+                    this.effects.push({
+                        type: 'particle', x: x * GRID_SIZE + 25, y: y * GRID_SIZE + 25,
+                        vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15,
+                        life: 1.0, color: i % 2 === 0 ? '#ffcc00' : '#ff4400'
+                    });
+                }
             }
 
             async endPlayerTurn() {
                 if (this.turnState !== 'PLAYER') return;
                 this.turnState = 'ENEMY';
                 this.updateUI();
-                this.ap = 0; 
                 await this.enemyAI();
-                this.beginPlayerTurn(); // Automatically start player turn after enemy
+                this.beginPlayerTurn();
             }
 
+            // AI Intelligence Upgrade
             async enemyAI() {
-                this.addLog("Hostile units scanning sectors...");
+                this.addLog("Hostile Fleet Scanning...");
                 await this.sleep(800);
-
                 let enemyAP = 10 + Math.floor(Math.random() * 5);
-                const activeEnemies = this.enemyShips.filter(e => e.hp > 0).sort(() => Math.random() - 0.5);
+                const active = this.enemyShips.filter(e => e.hp > 0).sort(() => Math.random() - 0.5);
 
-                for (const enemy of activeEnemies) {
+                for (const enemy of active) {
                     if (enemyAP <= 0) break;
                     
-                    const isTargeted = this.playerShips.some(p => {
+                    // 1. Threat Detection: Am I targeted?
+                    const isTargetedByPlayer = this.playerShips.some(p => {
                         if (p.hp <= 0) return false;
                         const rad = (p.angle - 90) * (Math.PI / 180);
-                        const dx = Math.cos(rad);
-                        const dy = Math.sin(rad);
-                        for(let i=1; i<=8; i++) {
-                            if (Math.round(p.x + dx*i) === enemy.x && Math.round(p.y + dy*i) === enemy.y) return true;
+                        const dx = Math.cos(rad), dy = Math.sin(rad);
+                        // Check player firing line
+                        for (let i = 1; i <= MAX_RANGE; i++) {
+                            if (Math.round(p.x + dx * i) === enemy.x && Math.round(p.y + dy * i) === enemy.y) return true;
                         }
                         return false;
                     });
 
-                    if (isTargeted && !enemy.shield && enemyAP >= 2) {
+                    // 2. Proximity Detection: Is a player ship facing me and close?
+                    const nearDangerousPlayer = this.playerShips.some(p => {
+                        if (p.hp <= 0) return false;
+                        const dist = Math.abs(p.x - enemy.x) + Math.abs(p.y - enemy.y);
+                        return dist <= MAX_RANGE + 1; // Approaching or in range
+                    });
+
+                    // Reactive Shielding
+                    if ((isTargetedByPlayer || nearDangerousPlayer) && !enemy.shield && enemyAP >= 2) {
                         enemy.shield = true;
                         enemyAP -= 2;
-                        this.addLog(`${enemy.name} targeted: Raising Shields!`);
+                        this.audio.play('shield');
+                        this.addLog(`${enemy.name} SENSORS ALERT: Shields Raised!`);
                         await this.sleep(400);
                     }
 
-                    if (enemy.shieldHp < enemy.maxShieldHp && enemyAP >= 4) {
+                    // Strategic Repair
+                    if (enemy.shield && enemy.shieldHp < enemy.maxShieldHp && enemyAP >= 4) {
                         enemy.shieldHp++;
                         enemyAP -= 4;
-                        this.addLog(`${enemy.name} performing field repairs.`);
+                        this.addLog(`${enemy.name} prioritizing shield repair.`);
                         await this.sleep(400);
                     }
 
+                    // Target Selection
                     const target = this.playerShips.filter(s => s.hp > 0).sort((a,b) => 
-                        (Math.abs(a.x - enemy.x) + Math.abs(a.y - enemy.y)) - 
-                        (Math.abs(b.x - enemy.x) + Math.abs(b.y - enemy.y))
+                        (Math.abs(a.x - enemy.x) + Math.abs(a.y - enemy.y)) - (Math.abs(b.x - enemy.x) + Math.abs(b.y - enemy.y))
                     )[0];
 
                     if (target) {
-                        const dx = target.x - enemy.x;
-                        const dy = target.y - enemy.y;
-                        const targetAngle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
-                        const snappedAngle = Math.round(targetAngle / 45) * 45;
-                        
-                        if (enemy.angle !== snappedAngle && enemyAP >= 1) {
-                            enemy.angle = snappedAngle;
-                            enemyAP -= 1;
-                            await this.sleep(300);
-                        }
-
                         const rad = (enemy.angle - 90) * (Math.PI / 180);
-                        const fdx = Math.cos(rad);
-                        const fdy = Math.sin(rad);
+                        const fdx = Math.cos(rad), fdy = Math.sin(rad);
+                        
                         let inSights = false;
-                        for(let i=1; i<=6; i++) {
-                            if (Math.round(enemy.x + fdx*i) === target.x && Math.round(enemy.y + fdy*i) === target.y) {
-                                inSights = true; break;
-                            }
+                        for(let i=1; i<=MAX_RANGE; i++) {
+                            if (Math.round(enemy.x + fdx*i) === target.x && Math.round(enemy.y + fdy*i) === target.y) { inSights = true; break; }
                         }
 
-                        if (inSights && enemyAP >= 3) {
-                            this.fireWeapon(enemy, this.playerShips, '#ff00ff');
-                            enemyAP -= 3;
-                            await this.sleep(600);
-                        } else if (enemyAP >= 1) {
-                            const nx = enemy.x + Math.round(fdx);
-                            const ny = enemy.y + Math.round(fdy);
-                            if (this.canMove(nx, ny)) {
-                                enemy.x = nx; enemy.y = ny;
-                                enemyAP -= 1;
-                                await this.sleep(400);
+                        if (inSights && enemyAP >= 3) { 
+                            this.fireWeapon(enemy, this.playerShips, '#ff00ff'); 
+                            enemyAP -= 3; 
+                            await this.sleep(600); 
+                        } else if (enemyAP >= 1) { 
+                            const dx = target.x - enemy.x, dy = target.y - enemy.y;
+                            const ta = Math.round((Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360 / 45) * 45;
+                            
+                            if (enemy.angle !== ta) { 
+                                enemy.angle = ta; 
+                                enemyAP -= 1; 
+                            } else { 
+                                const nx = enemy.x + Math.round(fdx), ny = enemy.y + Math.round(fdy); 
+                                if (this.canMove(nx, ny)) { 
+                                    enemy.x = nx; enemy.y = ny; 
+                                    enemyAP -= 1; 
+                                } 
                             }
+                            await this.sleep(400);
                         }
                     }
                 }
-
-                this.enemyShips.forEach(e => {
-                   if (e.shield && e.shieldHp <= 0) e.shield = false; 
-                });
-                this.addLog("Enemy maneuvers concluded.");
+                this.addLog("Hostile Fleet Turn End.");
                 await this.sleep(500);
             }
 
@@ -614,127 +650,140 @@
             }
 
             updateVisuals() {
-                const lerp = (start, end, amt) => start + (end - start) * amt;
-                const lerpAngle = (a, b, t) => {
-                    let diff = (b - a + 180) % 360 - 180;
-                    return a + diff * t;
-                };
+                const lerp = (s, e, a) => s + (e - s) * a;
+                const lerpA = (a, b, t) => { let d = (b - a + 180) % 360 - 180; return a + d * t; };
 
-                const process = (s) => {
-                    s.vx = lerp(s.vx, s.x, 0.12);
-                    s.vy = lerp(s.vy, s.y, 0.12);
-                    s.va = lerpAngle(s.va, s.angle, 0.12);
-                    s.pulse += 0.08;
-                };
+                this.stars.forEach(s => {
+                    s.y += s.speed;
+                    if (s.y > canvas.height) { s.y = 0; s.x = Math.random() * canvas.width; }
+                });
 
-                this.playerShips.forEach(process);
-                this.enemyShips.forEach(process);
+                if (this.shake > 0) this.shake *= 0.9;
+                else this.shake = 0;
+
+                this.playerShips.forEach(s => { s.vx = lerp(s.vx, s.x, 0.15); s.vy = lerp(s.vy, s.y, 0.15); s.va = lerpA(s.va, s.angle, 0.15); s.pulse += 0.08; });
+                this.enemyShips.forEach(s => { s.vx = lerp(s.vx, s.x, 0.15); s.vy = lerp(s.vy, s.y, 0.15); s.va = lerpA(s.va, s.angle, 0.12); s.pulse += 0.08; });
 
                 for (let i = this.effects.length - 1; i >= 0; i--) {
                     const f = this.effects[i];
-                    if (f.type === 'missile') {
-                        f.progress += 0.06;
-                        if (f.progress >= 1) {
-                            f.onHit();
-                            this.effects.splice(i, 1);
-                        }
+                    if (f.type === 'beam') { 
+                        f.life -= 0.15; 
+                        if (!f.onHitTriggered && f.life < 0.7) { f.onHit(); f.onHitTriggered = true; }
+                        if (f.life <= 0) this.effects.splice(i, 1); 
                     }
+                    else if (f.type === 'particle') { f.x += f.vx; f.y += f.vy; f.life -= 0.03; if (f.life <= 0) this.effects.splice(i, 1); }
                 }
+            }
+
+            drawShipLabel(ship, color) {
+                if (ship.hp <= 0) return;
+                const px = ship.vx * GRID_SIZE + 25, py = ship.vy * GRID_SIZE + 65;
+                ctx.fillStyle = color;
+                ctx.font = '6px "Press Start 2P"';
+                ctx.textAlign = 'center';
+                const sText = ship.shield ? `S:${"|".repeat(ship.shieldHp)}` : 'HULL';
+                ctx.fillText(sText, px, py);
             }
 
             drawCraft(ship, color, isPlayer) {
                 if (ship.hp <= 0) return;
-                const px = ship.vx * GRID_SIZE + GRID_SIZE/2;
-                const py = ship.vy * GRID_SIZE + GRID_SIZE/2;
-
+                const px = ship.vx * GRID_SIZE + 25, py = ship.vy * GRID_SIZE + 25;
                 ctx.save();
                 ctx.translate(px, py);
                 ctx.rotate(ship.va * Math.PI / 180);
+                
+                // Engine Flare
+                ctx.fillStyle = isPlayer ? `rgba(0, 255, 255, ${0.3 + Math.sin(ship.pulse) * 0.2})` : `rgba(255, 0, 255, ${0.3 + Math.sin(ship.pulse) * 0.2})`;
+                ctx.fillRect(-3, 14, 6, 10);
 
-                ctx.fillStyle = isPlayer ? `rgba(0, 255, 255, ${0.4 + Math.sin(ship.pulse) * 0.2})` : `rgba(255, 0, 255, ${0.4 + Math.sin(ship.pulse) * 0.2})`;
-                ctx.fillRect(-3, 12, 6, 8);
-
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = color;
-                ctx.fillStyle = color;
-
-                ctx.beginPath();
-                ctx.moveTo(0, -20);
-                ctx.lineTo(18, 14);
-                ctx.lineTo(0, 4);
-                ctx.lineTo(-18, 14);
-                ctx.closePath();
-                ctx.fill();
-
+                ctx.shadowBlur = 12; ctx.shadowColor = color; ctx.fillStyle = color;
+                ctx.beginPath(); ctx.moveTo(0, -22); ctx.lineTo(20, 16); ctx.lineTo(0, 6); ctx.lineTo(-20, 16); ctx.closePath(); ctx.fill();
+                
                 if (ship.shield) {
-                    const intensity = ship.shieldHp / ship.maxShieldHp;
-                    const sPulse = Math.sin(ship.pulse * 2.5) * 3;
+                    const intensity = (ship.shieldHp / ship.maxShieldHp) * 0.8;
+                    const sPulse = Math.sin(ship.pulse * 3) * 4;
                     ctx.strokeStyle = isPlayer ? `rgba(0, 255, 255, ${intensity})` : `rgba(255, 0, 255, ${intensity})`;
-                    ctx.lineWidth = intensity * 3;
-                    ctx.setLineDash([5, 3]);
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 26 + sPulse, 0, Math.PI * 2);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
+                    ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.arc(0, 0, 28 + sPulse, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
                 }
-
                 ctx.restore();
+                this.drawShipLabel(ship, color);
             }
 
             render() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.save();
+                if (this.shake > 0) {
+                    ctx.translate((Math.random()-0.5)*this.shake, (Math.random()-0.5)*this.shake);
+                }
 
-                ctx.strokeStyle = '#1a1a1a';
+                // Starfield
+                this.stars.forEach(s => {
+                    ctx.fillStyle = s.color;
+                    ctx.globalAlpha = s.speed;
+                    ctx.fillRect(s.x, s.y, s.size, s.size);
+                });
+                ctx.globalAlpha = 1.0;
+
+                // Tactical Grid
+                ctx.strokeStyle = '#151515';
                 ctx.lineWidth = 1;
                 for(let i=0; i<=COLS; i++) {
                     ctx.beginPath(); ctx.moveTo(i*GRID_SIZE, 0); ctx.lineTo(i*GRID_SIZE, canvas.height); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(0, i*GRID_SIZE); ctx.lineTo(canvas.width, i*GRID_SIZE); ctx.stroke();
                 }
 
+                // Ships
+                this.playerShips.forEach(s => this.drawCraft(s, '#00ff00', true));
+                this.enemyShips.forEach(s => this.drawCraft(s, '#ff00ff', false));
+
+                // Targeting Line Preview (Range Limited)
                 const sel = this.playerShips[this.selectedShipIndex];
                 if (this.turnState === 'PLAYER' && sel.hp > 0) {
                     ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)';
                     ctx.strokeRect(sel.vx * GRID_SIZE + 1, sel.vy * GRID_SIZE + 1, GRID_SIZE - 2, GRID_SIZE - 2);
-                    
-                    const rad = (sel.angle - 90) * (Math.PI / 180);
+                    const r = (sel.angle - 90) * (Math.PI / 180);
                     ctx.beginPath();
-                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
+                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
                     ctx.moveTo(sel.vx * GRID_SIZE + 25, sel.vy * GRID_SIZE + 25);
-                    ctx.lineTo((sel.vx + Math.cos(rad) * 10) * GRID_SIZE + 25, (sel.vy + Math.sin(rad) * 10) * GRID_SIZE + 25);
+                    ctx.lineTo((sel.vx + Math.cos(r) * MAX_RANGE) * GRID_SIZE + 25, (sel.vy + Math.sin(r) * MAX_RANGE) * GRID_SIZE + 25);
                     ctx.stroke();
+                    ctx.setLineDash([]);
                 }
 
-                this.playerShips.forEach(s => this.drawCraft(s, '#00ff00', true));
-                this.enemyShips.forEach(s => this.drawCraft(s, '#ff00ff', false));
-
+                // Combat Effects
                 this.effects.forEach(f => {
-                    if (f.type === 'missile') {
-                        const mx = (f.x + (f.tx - f.x) * f.progress) * GRID_SIZE + 25;
-                        const my = (f.y + (f.ty - f.y) * f.progress) * GRID_SIZE + 25;
-                        ctx.fillStyle = f.color;
-                        ctx.shadowBlur = 12;
-                        ctx.shadowColor = f.color;
+                    if (f.type === 'beam') {
+                        ctx.strokeStyle = f.color;
+                        ctx.lineWidth = f.life * 10;
+                        ctx.globalAlpha = f.life;
+                        ctx.shadowBlur = 15; ctx.shadowColor = f.color;
                         ctx.beginPath();
-                        ctx.arc(mx, my, 4, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.shadowBlur = 0;
+                        ctx.moveTo(f.x * GRID_SIZE + 25, f.y * GRID_SIZE + 25);
+                        ctx.lineTo(f.tx * GRID_SIZE + 25, f.ty * GRID_SIZE + 25);
+                        ctx.stroke();
+                        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+                    } else if (f.type === 'particle') {
+                        ctx.fillStyle = f.color; ctx.globalAlpha = f.life; 
+                        ctx.fillRect(f.x, f.y, 4, 4); 
+                        ctx.globalAlpha = 1;
                     }
                 });
 
-                if (this.playerShips.every(s => s.hp <= 0)) {
-                    this.drawOverlay("SQUAD WIPED", "#ff3333");
-                } else if (this.enemyShips.every(s => s.hp <= 0)) {
-                    this.drawOverlay("VICTORY", "#00ff00");
-                }
+                ctx.restore();
+
+                if (this.playerShips.every(s => s.hp <= 0)) this.drawOverlay("SQUAD LOST", "#ff3333");
+                else if (this.enemyShips.every(s => s.hp <= 0)) this.drawOverlay("SECTOR CLEARED", "#00ff00");
             }
             
             drawOverlay(text, color) {
-                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.fillStyle = 'rgba(0,0,0,0.85)';
                 ctx.fillRect(0,0,canvas.width, canvas.height);
-                ctx.fillStyle = color;
-                ctx.textAlign = 'center';
-                ctx.font = '24px "Press Start 2P"';
+                ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.font = '24px "Press Start 2P"'; 
                 ctx.fillText(text, canvas.width/2, canvas.height/2);
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillText("REFRESH TO RESTART", canvas.width/2, canvas.height/2 + 50);
             }
         }
 
