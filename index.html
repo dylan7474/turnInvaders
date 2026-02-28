@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galactic Tactics: Advanced Tactical AI</title>
+    <title>Galactic Tactics: Seamless Battle Flow</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
@@ -120,19 +120,13 @@
         }
 
         .btn-roll {
-            background: #ff00ff;
+            background: #444;
             color: white;
             border: none;
             padding: 15px;
             font-size: 12px;
-            cursor: pointer;
             width: 100%;
-            box-shadow: 0 4px 0 #b300b3;
-        }
-
-        .btn-roll:disabled {
-            background: #444;
-            box-shadow: none;
+            cursor: default;
         }
 
         .log {
@@ -177,18 +171,18 @@
                 <div class="flex justify-between items-center mb-2">
                     <span id="dice-val" class="text-xl">🎲 ?</span>
                     <div class="text-right">
-                        <span id="turn-indicator" class="text-[7px] text-gray-400 block mb-1">WAITING...</span>
+                        <span id="turn-indicator" class="text-[7px] text-gray-400 block mb-1">AUTO-SYNC...</span>
                         <span class="text-[8px] text-gray-500">AP</span><br>
                         <span id="ap-val" class="text-white text-lg">0</span>
                     </div>
                 </div>
-                <button id="roll-btn" class="btn-roll" onclick="game.rollDice()">ROLL [R]</button>
+                <div class="text-[7px] text-center text-gray-600 mb-1">DICE AUTO-ROLL ON TURN START</div>
             </div>
 
             <div class="stat-box">
                 <div class="ship-selector" id="ship-selector"></div>
                 <div id="active-ship-stats" class="text-[9px]">
-                    HULL: [|||] 3/3 <br>
+                    STATUS: [|||] ONLINE <br>
                     SHIELD: OFF
                 </div>
             </div>
@@ -218,10 +212,14 @@
                     <div>SHIELD<span class="key-hint">[Q]</span></div> 
                     <span class="bg-green-900 px-1 text-white">2</span>
                 </button>
+                <button class="btn-action" onclick="game.takeAction('repair')" data-cost="4" style="grid-column: span 2;">
+                    <div>REPAIR SHIELDS<span class="key-hint">[H]</span></div> 
+                    <span class="bg-green-900 px-1 text-white">4</span>
+                </button>
             </div>
             
             <button id="end-turn-btn" class="btn-action" onclick="game.endPlayerTurn()" style="border-color: #ff3333; color: #ff3333; width: 100%;">
-                <span>END TURN [SPACE]</span>
+                <span>PASS TURN [SPACE]</span>
             </button>
 
             <div class="log" id="game-log">
@@ -240,27 +238,29 @@
         class Game {
             constructor() {
                 this.ap = 0;
-                this.turnState = 'START';
+                this.turnState = 'PLAYER';
                 this.animating = false;
                 
                 this.playerShips = [
-                    { id: 0, name: 'ALPHA', x: 2, y: 10, angle: 0, hp: 3, shield: false, vx: 2, vy: 10, va: 0, pulse: 0 },
-                    { id: 1, name: 'BRAVO', x: 6, y: 10, angle: 0, hp: 3, shield: false, vx: 6, vy: 10, va: 0, pulse: 0 },
-                    { id: 2, name: 'CHARLIE', x: 10, y: 10, angle: 0, hp: 3, shield: false, vx: 10, vy: 10, va: 0, pulse: 0 }
+                    { id: 0, name: 'ALPHA', x: 2, y: 10, angle: 0, hp: 1, shield: false, shieldHp: 2, maxShieldHp: 2, vx: 2, vy: 10, va: 0, pulse: 0 },
+                    { id: 1, name: 'BRAVO', x: 6, y: 10, angle: 0, hp: 1, shield: false, shieldHp: 2, maxShieldHp: 2, vx: 6, vy: 10, va: 0, pulse: 0 },
+                    { id: 2, name: 'CHARLIE', x: 10, y: 10, angle: 0, hp: 1, shield: false, shieldHp: 2, maxShieldHp: 2, vx: 10, vy: 10, va: 0, pulse: 0 }
                 ];
                 
                 this.enemyShips = [
-                    { id: 10, name: 'E-1', x: 2, y: 1, angle: 180, hp: 2, shield: false, vx: 2, vy: 1, va: 180, pulse: 0 },
-                    { id: 11, name: 'E-2', x: 6, y: 1, angle: 180, hp: 2, shield: false, vx: 6, vy: 1, va: 180, pulse: 0 },
-                    { id: 12, name: 'E-3', x: 10, y: 1, angle: 180, hp: 2, shield: false, vx: 10, vy: 1, va: 180, pulse: 0 }
+                    { id: 10, name: 'E-1', x: 2, y: 1, angle: 180, hp: 1, shield: false, shieldHp: 2, maxShieldHp: 2, vx: 2, vy: 1, va: 180, pulse: 0 },
+                    { id: 11, name: 'E-2', x: 6, y: 1, angle: 180, hp: 1, shield: false, shieldHp: 2, maxShieldHp: 2, vx: 6, vy: 1, va: 180, pulse: 0 },
+                    { id: 12, name: 'E-3', x: 10, y: 1, angle: 180, hp: 1, shield: false, shieldHp: 2, maxShieldHp: 2, vx: 10, vy: 1, va: 180, pulse: 0 }
                 ];
 
                 this.selectedShipIndex = 0;
                 this.effects = [];
                 
                 this.setupKeyboard();
-                this.updateUI();
                 this.startAnimationLoop();
+                
+                // Start the very first turn
+                setTimeout(() => this.beginPlayerTurn(), 500);
             }
 
             setupKeyboard() {
@@ -271,7 +271,7 @@
                     if (key === '1') this.selectShip(0);
                     if (key === '2') this.selectShip(1);
                     if (key === '3') this.selectShip(2);
-                    if (key === 'R') this.rollDice();
+                    if (key === 'H') this.takeAction('repair');
                     if (key === ' ' || key === 'E') this.endPlayerTurn();
 
                     if (this.turnState === 'PLAYER') {
@@ -301,8 +301,7 @@
 
             updateUI() {
                 document.getElementById('ap-val').textContent = this.ap;
-                document.getElementById('roll-btn').disabled = this.turnState !== 'START';
-                document.getElementById('turn-indicator').textContent = this.turnState === 'ENEMY' ? 'HOSTILE TURN' : (this.turnState === 'PLAYER' ? 'YOUR TURN' : 'READY TO ROLL');
+                document.getElementById('turn-indicator').textContent = this.turnState === 'ENEMY' ? 'HOSTILE TURN' : 'SQUAD TURN';
                 document.getElementById('turn-indicator').style.color = this.turnState === 'ENEMY' ? '#ff3333' : '#00ff00';
 
                 const selector = document.getElementById('ship-selector');
@@ -316,9 +315,10 @@
                 });
 
                 const active = this.playerShips[this.selectedShipIndex];
+                const shieldIntegrity = active.hp > 0 ? `${"|".repeat(active.shieldHp)}${".".repeat(active.maxShieldHp - active.shieldHp)}` : "VOID";
                 document.getElementById('active-ship-stats').innerHTML = `
-                    HULL: ${"|".repeat(active.hp)}${".".repeat(3-active.hp)} ${active.hp}/3 <br>
-                    SHIELD: <span style="color:${active.shield ? '#00ffff' : '#ff3333'}">${active.shield ? 'ACTIVE' : 'OFF'}</span>
+                    SHIELD INTEGRITY: [${shieldIntegrity}] <br>
+                    POWER: <span style="color:${active.shield ? '#00ffff' : '#ff3333'}">${active.shield ? 'SHIELDS ACTIVE' : 'SHIELDS OFF'}</span>
                 `;
 
                 const actionButtons = document.querySelectorAll('.btn-action');
@@ -330,46 +330,53 @@
                 document.getElementById('end-turn-btn').disabled = this.turnState !== 'PLAYER' || this.animating;
             }
 
-            rollDice() {
-                if (this.turnState !== 'START') return;
+            beginPlayerTurn() {
+                if (this.playerShips.every(s => s.hp <= 0)) return;
+                
+                this.turnState = 'PLAYER';
                 const d1 = Math.floor(Math.random() * 6) + 1;
                 const d2 = Math.floor(Math.random() * 6) + 1;
                 this.ap = d1 + d2;
                 document.getElementById('dice-val').textContent = `🎲 ${d1} + ${d2}`;
-                this.turnState = 'PLAYER';
+                
+                this.addLog(`Turn Start. Gained ${this.ap} AP.`);
                 
                 this.playerShips.forEach(s => {
                     if (s.shield && s.hp > 0) {
                         this.ap = Math.max(0, this.ap - 1);
-                        this.addLog(`${s.name} shield draw: -1 AP`);
+                        this.addLog(`${s.name} maintenance: -1 AP`);
                     }
                 });
+
                 this.updateUI();
+
+                if (this.ap <= 0) {
+                    this.addLog("No remaining AP. Switching turn...");
+                    setTimeout(() => this.endPlayerTurn(), 1000);
+                }
             }
 
             takeAction(type) {
                 if (this.turnState !== 'PLAYER' || this.animating) return;
                 const ship = this.playerShips[this.selectedShipIndex];
                 
-                // 1. Determine base cost before acting
                 const costs = {
                     'moveFwd': 1,
                     'moveBack': 2,
                     'rotL': 1,
                     'rotR': 1,
                     'fire': 3,
-                    'shield': 2
+                    'shield': 2,
+                    'repair': 4
                 };
                 
                 let cost = costs[type] || 0;
 
-                // 2. Validate AP
                 if (this.ap < cost) {
                     this.addLog("Insufficient AP!");
                     return;
                 }
 
-                // 3. Execute logic
                 let actionSucceeded = false;
                 const rad = (ship.angle - 90) * (Math.PI / 180);
                 const dx = Math.round(Math.cos(rad));
@@ -409,14 +416,37 @@
                         this.addLog(`${ship.name} shields ${ship.shield ? 'UP' : 'DOWN'}`);
                         actionSucceeded = true;
                         break;
+                    case 'repair':
+                        if (ship.shieldHp < ship.maxShieldHp) {
+                            ship.shieldHp++;
+                            this.addLog(`${ship.name} shield repaired.`);
+                            actionSucceeded = true;
+                        } else {
+                            this.addLog("Shield integrity at maximum.");
+                        }
+                        break;
                 }
 
-                // 4. Deduct AP and trigger anim only if action actually happened
                 if (actionSucceeded) {
                     this.ap -= cost;
                     this.triggerAnimationDelay();
+                    this.checkAutoEnd();
                 }
                 this.updateUI();
+            }
+
+            checkAutoEnd() {
+                // If AP is zero, wait for current actions to settle then end turn
+                if (this.ap <= 0) {
+                    const checkInterval = setInterval(() => {
+                        if (this.effects.length === 0 && !this.animating) {
+                            clearInterval(checkInterval);
+                            if (this.turnState === 'PLAYER' && this.ap <= 0) {
+                                this.endPlayerTurn();
+                            }
+                        }
+                    }, 500);
+                }
             }
 
             triggerAnimationDelay(ms = 300) {
@@ -460,11 +490,16 @@
                     color: color,
                     onHit: () => {
                         if (hit) {
-                            if (hit.shield) {
-                                this.addLog(`${hit.name} shield absorbed impact!`);
+                            if (hit.shield && hit.shieldHp > 0) {
+                                hit.shieldHp--;
+                                this.addLog(`${hit.name} shield damaged!`);
+                                if (hit.shieldHp <= 0) {
+                                    hit.shield = false;
+                                    this.addLog(`${hit.name} SHIELDS COLLAPSED!`);
+                                }
                             } else {
-                                hit.hp--;
-                                this.addLog(`${hit.name} hull impact!`);
+                                hit.hp = 0;
+                                this.addLog(`${hit.name} DESTROYED!`);
                             }
                         } else {
                             this.addLog(`${source.name} fire missed.`);
@@ -479,15 +514,14 @@
                 this.updateUI();
                 this.ap = 0; 
                 await this.enemyAI();
-                this.turnState = 'START';
-                this.updateUI();
+                this.beginPlayerTurn(); // Automatically start player turn after enemy
             }
 
             async enemyAI() {
                 this.addLog("Hostile units scanning sectors...");
                 await this.sleep(800);
 
-                let enemyAP = 8 + Math.floor(Math.random() * 5);
+                let enemyAP = 10 + Math.floor(Math.random() * 5);
                 const activeEnemies = this.enemyShips.filter(e => e.hp > 0).sort(() => Math.random() - 0.5);
 
                 for (const enemy of activeEnemies) {
@@ -507,7 +541,14 @@
                     if (isTargeted && !enemy.shield && enemyAP >= 2) {
                         enemy.shield = true;
                         enemyAP -= 2;
-                        this.addLog(`${enemy.name} detected lock: Raising Shields!`);
+                        this.addLog(`${enemy.name} targeted: Raising Shields!`);
+                        await this.sleep(400);
+                    }
+
+                    if (enemy.shieldHp < enemy.maxShieldHp && enemyAP >= 4) {
+                        enemy.shieldHp++;
+                        enemyAP -= 4;
+                        this.addLog(`${enemy.name} performing field repairs.`);
                         await this.sleep(400);
                     }
 
@@ -554,7 +595,9 @@
                     }
                 }
 
-                this.enemyShips.forEach(e => e.shield = false);
+                this.enemyShips.forEach(e => {
+                   if (e.shield && e.shieldHp <= 0) e.shield = false; 
+                });
                 this.addLog("Enemy maneuvers concluded.");
                 await this.sleep(500);
             }
@@ -624,9 +667,10 @@
                 ctx.fill();
 
                 if (ship.shield) {
+                    const intensity = ship.shieldHp / ship.maxShieldHp;
                     const sPulse = Math.sin(ship.pulse * 2.5) * 3;
-                    ctx.strokeStyle = isPlayer ? '#00ffff' : '#ff00ff';
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = isPlayer ? `rgba(0, 255, 255, ${intensity})` : `rgba(255, 0, 255, ${intensity})`;
+                    ctx.lineWidth = intensity * 3;
                     ctx.setLineDash([5, 3]);
                     ctx.beginPath();
                     ctx.arc(0, 0, 26 + sPulse, 0, Math.PI * 2);
