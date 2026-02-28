@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic Tactics: Advanced Tactical AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #050505;
+            color: #00ff00;
+            font-family: 'Press Start 2P', cursive;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        #game-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        #canvas-container {
+            position: relative;
+            border: 4px solid #333;
+            background: #000;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.15);
+        }
+
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .dashboard {
+            width: 360px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #111;
+            padding: 15px;
+            border: 2px solid #333;
+            border-radius: 4px;
+        }
+
+        .stat-box {
+            border: 1px solid #444;
+            padding: 10px;
+            font-size: 10px;
+            line-height: 1.6;
+            background: #0a0a0a;
+        }
+
+        .ship-selector {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .ship-tab {
+            flex: 1;
+            padding: 8px;
+            background: #222;
+            border: 1px solid #444;
+            font-size: 7px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .ship-tab.active {
+            border-color: #00ff00;
+            background: #004400;
+            color: #fff;
+            box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .btn-action {
+            background: #1a1a1a;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px;
+            font-size: 8px;
+            cursor: pointer;
+            transition: all 0.1s;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-action:hover:not(:disabled) {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .btn-action:disabled {
+            border-color: #333;
+            color: #444;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .btn-roll {
+            background: #ff00ff;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 4px 0 #b300b3;
+        }
+
+        .btn-roll:disabled {
+            background: #444;
+            box-shadow: none;
+        }
+
+        .log {
+            height: 140px;
+            overflow-y: auto;
+            font-size: 8px;
+            color: #888;
+            background: #000;
+            padding: 8px;
+            border: 1px solid #222;
+            line-height: 1.4;
+        }
+
+        .key-hint {
+            font-size: 7px;
+            color: #666;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .crt::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 100;
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="crt">
+
+    <div id="game-wrapper">
+        <div id="canvas-container">
+            <canvas id="gameCanvas" width="600" height="600"></canvas>
+        </div>
+
+        <div class="dashboard">
+            <div class="stat-box">
+                <div class="flex justify-between items-center mb-2">
+                    <span id="dice-val" class="text-xl">🎲 ?</span>
+                    <div class="text-right">
+                        <span id="turn-indicator" class="text-[7px] text-gray-400 block mb-1">WAITING...</span>
+                        <span class="text-[8px] text-gray-500">AP</span><br>
+                        <span id="ap-val" class="text-white text-lg">0</span>
+                    </div>
+                </div>
+                <button id="roll-btn" class="btn-roll" onclick="game.rollDice()">ROLL [R]</button>
+            </div>
+
+            <div class="stat-box">
+                <div class="ship-selector" id="ship-selector"></div>
+                <div id="active-ship-stats" class="text-[9px]">
+                    HULL: [|||] 3/3 <br>
+                    SHIELD: OFF
+                </div>
+            </div>
+
+            <div id="actions-container" class="btn-grid">
+                <button class="btn-action" onclick="game.takeAction('moveFwd')" data-cost="1">
+                    <div>MOVE FWD<span class="key-hint">[W]</span></div> 
+                    <span class="bg-green-900 px-1 text-white">1</span>
+                </button>
+                <button class="btn-action" onclick="game.takeAction('moveBack')" data-cost="2">
+                    <div>REVERSE<span class="key-hint">[S]</span></div> 
+                    <span class="bg-green-900 px-1 text-white">2</span>
+                </button>
+                <button class="btn-action" onclick="game.takeAction('rotL')" data-cost="1">
+                    <div>ROT L<span class="key-hint">[A]</span></div> 
+                    <span class="bg-green-900 px-1 text-white">1</span>
+                </button>
+                <button class="btn-action" onclick="game.takeAction('rotR')" data-cost="1">
+                    <div>ROT R<span class="key-hint">[D]</span></div> 
+                    <span class="bg-green-900 px-1 text-white">1</span>
+                </button>
+                <button class="btn-action" onclick="game.takeAction('fire')" data-cost="3">
+                    <div>MISSILE<span class="key-hint">[F]</span></div> 
+                    <span class="bg-green-900 px-1 text-white">3</span>
+                </button>
+                <button class="btn-action" onclick="game.takeAction('shield')" data-cost="2">
+                    <div>SHIELD<span class="key-hint">[Q]</span></div> 
+                    <span class="bg-green-900 px-1 text-white">2</span>
+                </button>
+            </div>
+            
+            <button id="end-turn-btn" class="btn-action" onclick="game.endPlayerTurn()" style="border-color: #ff3333; color: #ff3333; width: 100%;">
+                <span>END TURN [SPACE]</span>
+            </button>
+
+            <div class="log" id="game-log">
+                Combat Systems Ready.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const GRID_SIZE = 50;
+        const COLS = canvas.width / GRID_SIZE;
+        const ROWS = canvas.height / GRID_SIZE;
+
+        class Game {
+            constructor() {
+                this.ap = 0;
+                this.turnState = 'START';
+                this.animating = false;
+                
+                this.playerShips = [
+                    { id: 0, name: 'ALPHA', x: 2, y: 10, angle: 0, hp: 3, shield: false, vx: 2, vy: 10, va: 0, pulse: 0 },
+                    { id: 1, name: 'BRAVO', x: 6, y: 10, angle: 0, hp: 3, shield: false, vx: 6, vy: 10, va: 0, pulse: 0 },
+                    { id: 2, name: 'CHARLIE', x: 10, y: 10, angle: 0, hp: 3, shield: false, vx: 10, vy: 10, va: 0, pulse: 0 }
+                ];
+                
+                this.enemyShips = [
+                    { id: 10, name: 'E-1', x: 2, y: 1, angle: 180, hp: 2, shield: false, vx: 2, vy: 1, va: 180, pulse: 0 },
+                    { id: 11, name: 'E-2', x: 6, y: 1, angle: 180, hp: 2, shield: false, vx: 6, vy: 1, va: 180, pulse: 0 },
+                    { id: 12, name: 'E-3', x: 10, y: 1, angle: 180, hp: 2, shield: false, vx: 10, vy: 1, va: 180, pulse: 0 }
+                ];
+
+                this.selectedShipIndex = 0;
+                this.effects = [];
+                
+                this.setupKeyboard();
+                this.updateUI();
+                this.startAnimationLoop();
+            }
+
+            setupKeyboard() {
+                window.addEventListener('keydown', (e) => {
+                    if (this.animating || this.turnState === 'ENEMY') return;
+                    const key = e.key.toUpperCase();
+                    
+                    if (key === '1') this.selectShip(0);
+                    if (key === '2') this.selectShip(1);
+                    if (key === '3') this.selectShip(2);
+                    if (key === 'R') this.rollDice();
+                    if (key === ' ' || key === 'E') this.endPlayerTurn();
+
+                    if (this.turnState === 'PLAYER') {
+                        if (key === 'W') this.takeAction('moveFwd');
+                        if (key === 'S') this.takeAction('moveBack');
+                        if (key === 'A') this.takeAction('rotL');
+                        if (key === 'D') this.takeAction('rotR');
+                        if (key === 'F') this.takeAction('fire');
+                        if (key === 'Q') this.takeAction('shield');
+                    }
+                });
+            }
+
+            selectShip(idx) {
+                if (this.playerShips[idx].hp > 0) {
+                    this.selectedShipIndex = idx;
+                    this.updateUI();
+                }
+            }
+
+            addLog(msg) {
+                const log = document.getElementById('game-log');
+                const div = document.createElement('div');
+                div.textContent = `> ${msg}`;
+                log.prepend(div);
+            }
+
+            updateUI() {
+                document.getElementById('ap-val').textContent = this.ap;
+                document.getElementById('roll-btn').disabled = this.turnState !== 'START';
+                document.getElementById('turn-indicator').textContent = this.turnState === 'ENEMY' ? 'HOSTILE TURN' : (this.turnState === 'PLAYER' ? 'YOUR TURN' : 'READY TO ROLL');
+                document.getElementById('turn-indicator').style.color = this.turnState === 'ENEMY' ? '#ff3333' : '#00ff00';
+
+                const selector = document.getElementById('ship-selector');
+                selector.innerHTML = '';
+                this.playerShips.forEach((s, i) => {
+                    const tab = document.createElement('div');
+                    tab.className = `ship-tab ${this.selectedShipIndex === i ? 'active' : ''} ${s.hp <= 0 ? 'opacity-30' : ''}`;
+                    tab.textContent = s.name;
+                    tab.onclick = () => this.selectShip(i);
+                    selector.appendChild(tab);
+                });
+
+                const active = this.playerShips[this.selectedShipIndex];
+                document.getElementById('active-ship-stats').innerHTML = `
+                    HULL: ${"|".repeat(active.hp)}${".".repeat(3-active.hp)} ${active.hp}/3 <br>
+                    SHIELD: <span style="color:${active.shield ? '#00ffff' : '#ff3333'}">${active.shield ? 'ACTIVE' : 'OFF'}</span>
+                `;
+
+                const actionButtons = document.querySelectorAll('.btn-action');
+                actionButtons.forEach(btn => {
+                    const cost = parseInt(btn.getAttribute('data-cost')) || 0;
+                    btn.disabled = (this.turnState !== 'PLAYER' || this.ap < cost || active.hp <= 0 || this.animating);
+                });
+                
+                document.getElementById('end-turn-btn').disabled = this.turnState !== 'PLAYER' || this.animating;
+            }
+
+            rollDice() {
+                if (this.turnState !== 'START') return;
+                const d1 = Math.floor(Math.random() * 6) + 1;
+                const d2 = Math.floor(Math.random() * 6) + 1;
+                this.ap = d1 + d2;
+                document.getElementById('dice-val').textContent = `🎲 ${d1} + ${d2}`;
+                this.turnState = 'PLAYER';
+                
+                this.playerShips.forEach(s => {
+                    if (s.shield && s.hp > 0) {
+                        this.ap = Math.max(0, this.ap - 1);
+                        this.addLog(`${s.name} shield draw: -1 AP`);
+                    }
+                });
+                this.updateUI();
+            }
+
+            takeAction(type) {
+                if (this.turnState !== 'PLAYER' || this.animating) return;
+                const ship = this.playerShips[this.selectedShipIndex];
+                
+                // 1. Determine base cost before acting
+                const costs = {
+                    'moveFwd': 1,
+                    'moveBack': 2,
+                    'rotL': 1,
+                    'rotR': 1,
+                    'fire': 3,
+                    'shield': 2
+                };
+                
+                let cost = costs[type] || 0;
+
+                // 2. Validate AP
+                if (this.ap < cost) {
+                    this.addLog("Insufficient AP!");
+                    return;
+                }
+
+                // 3. Execute logic
+                let actionSucceeded = false;
+                const rad = (ship.angle - 90) * (Math.PI / 180);
+                const dx = Math.round(Math.cos(rad));
+                const dy = Math.round(Math.sin(rad));
+
+                switch(type) {
+                    case 'moveFwd':
+                        if (this.canMove(ship.x + dx, ship.y + dy)) { 
+                            ship.x += dx; ship.y += dy; 
+                            actionSucceeded = true;
+                        } else {
+                            this.addLog("Path obstructed!");
+                        }
+                        break;
+                    case 'moveBack':
+                        if (this.canMove(ship.x - dx, ship.y - dy)) { 
+                            ship.x -= dx; ship.y -= dy; 
+                            actionSucceeded = true;
+                        } else {
+                            this.addLog("Path obstructed!");
+                        }
+                        break;
+                    case 'rotL':
+                        ship.angle = (ship.angle - 45 + 360) % 360;
+                        actionSucceeded = true;
+                        break;
+                    case 'rotR':
+                        ship.angle = (ship.angle + 45) % 360;
+                        actionSucceeded = true;
+                        break;
+                    case 'fire':
+                        this.fireWeapon(ship, this.enemyShips, '#00ff00');
+                        actionSucceeded = true;
+                        break;
+                    case 'shield':
+                        ship.shield = !ship.shield;
+                        this.addLog(`${ship.name} shields ${ship.shield ? 'UP' : 'DOWN'}`);
+                        actionSucceeded = true;
+                        break;
+                }
+
+                // 4. Deduct AP and trigger anim only if action actually happened
+                if (actionSucceeded) {
+                    this.ap -= cost;
+                    this.triggerAnimationDelay();
+                }
+                this.updateUI();
+            }
+
+            triggerAnimationDelay(ms = 300) {
+                this.animating = true;
+                setTimeout(() => {
+                    this.animating = false;
+                    this.updateUI();
+                }, ms);
+            }
+
+            canMove(nx, ny) {
+                if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) return false;
+                return ![...this.playerShips, ...this.enemyShips].some(s => s.hp > 0 && s.x === nx && s.y === ny);
+            }
+
+            fireWeapon(source, potentialTargets, color) {
+                const rad = (source.angle - 90) * (Math.PI / 180);
+                const dx = Math.cos(rad);
+                const dy = Math.sin(rad);
+                
+                let hit = null;
+                let targetX = source.x + dx * 12;
+                let targetY = source.y + dy * 12;
+
+                for (let i = 1; i <= 10; i++) {
+                    const cx = Math.round(source.x + dx * i);
+                    const cy = Math.round(source.y + dy * i);
+                    const enemy = potentialTargets.find(e => e.hp > 0 && e.x === cx && e.y === cy);
+                    if (enemy) {
+                        hit = enemy;
+                        targetX = cx; targetY = cy;
+                        break;
+                    }
+                }
+
+                this.effects.push({ 
+                    type: 'missile', 
+                    x: source.x, y: source.y, 
+                    tx: targetX, ty: targetY, 
+                    progress: 0, 
+                    color: color,
+                    onHit: () => {
+                        if (hit) {
+                            if (hit.shield) {
+                                this.addLog(`${hit.name} shield absorbed impact!`);
+                            } else {
+                                hit.hp--;
+                                this.addLog(`${hit.name} hull impact!`);
+                            }
+                        } else {
+                            this.addLog(`${source.name} fire missed.`);
+                        }
+                    }
+                });
+            }
+
+            async endPlayerTurn() {
+                if (this.turnState !== 'PLAYER') return;
+                this.turnState = 'ENEMY';
+                this.updateUI();
+                this.ap = 0; 
+                await this.enemyAI();
+                this.turnState = 'START';
+                this.updateUI();
+            }
+
+            async enemyAI() {
+                this.addLog("Hostile units scanning sectors...");
+                await this.sleep(800);
+
+                let enemyAP = 8 + Math.floor(Math.random() * 5);
+                const activeEnemies = this.enemyShips.filter(e => e.hp > 0).sort(() => Math.random() - 0.5);
+
+                for (const enemy of activeEnemies) {
+                    if (enemyAP <= 0) break;
+                    
+                    const isTargeted = this.playerShips.some(p => {
+                        if (p.hp <= 0) return false;
+                        const rad = (p.angle - 90) * (Math.PI / 180);
+                        const dx = Math.cos(rad);
+                        const dy = Math.sin(rad);
+                        for(let i=1; i<=8; i++) {
+                            if (Math.round(p.x + dx*i) === enemy.x && Math.round(p.y + dy*i) === enemy.y) return true;
+                        }
+                        return false;
+                    });
+
+                    if (isTargeted && !enemy.shield && enemyAP >= 2) {
+                        enemy.shield = true;
+                        enemyAP -= 2;
+                        this.addLog(`${enemy.name} detected lock: Raising Shields!`);
+                        await this.sleep(400);
+                    }
+
+                    const target = this.playerShips.filter(s => s.hp > 0).sort((a,b) => 
+                        (Math.abs(a.x - enemy.x) + Math.abs(a.y - enemy.y)) - 
+                        (Math.abs(b.x - enemy.x) + Math.abs(b.y - enemy.y))
+                    )[0];
+
+                    if (target) {
+                        const dx = target.x - enemy.x;
+                        const dy = target.y - enemy.y;
+                        const targetAngle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+                        const snappedAngle = Math.round(targetAngle / 45) * 45;
+                        
+                        if (enemy.angle !== snappedAngle && enemyAP >= 1) {
+                            enemy.angle = snappedAngle;
+                            enemyAP -= 1;
+                            await this.sleep(300);
+                        }
+
+                        const rad = (enemy.angle - 90) * (Math.PI / 180);
+                        const fdx = Math.cos(rad);
+                        const fdy = Math.sin(rad);
+                        let inSights = false;
+                        for(let i=1; i<=6; i++) {
+                            if (Math.round(enemy.x + fdx*i) === target.x && Math.round(enemy.y + fdy*i) === target.y) {
+                                inSights = true; break;
+                            }
+                        }
+
+                        if (inSights && enemyAP >= 3) {
+                            this.fireWeapon(enemy, this.playerShips, '#ff00ff');
+                            enemyAP -= 3;
+                            await this.sleep(600);
+                        } else if (enemyAP >= 1) {
+                            const nx = enemy.x + Math.round(fdx);
+                            const ny = enemy.y + Math.round(fdy);
+                            if (this.canMove(nx, ny)) {
+                                enemy.x = nx; enemy.y = ny;
+                                enemyAP -= 1;
+                                await this.sleep(400);
+                            }
+                        }
+                    }
+                }
+
+                this.enemyShips.forEach(e => e.shield = false);
+                this.addLog("Enemy maneuvers concluded.");
+                await this.sleep(500);
+            }
+
+            sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+            startAnimationLoop() {
+                const step = () => {
+                    this.updateVisuals();
+                    this.render();
+                    requestAnimationFrame(step);
+                };
+                requestAnimationFrame(step);
+            }
+
+            updateVisuals() {
+                const lerp = (start, end, amt) => start + (end - start) * amt;
+                const lerpAngle = (a, b, t) => {
+                    let diff = (b - a + 180) % 360 - 180;
+                    return a + diff * t;
+                };
+
+                const process = (s) => {
+                    s.vx = lerp(s.vx, s.x, 0.12);
+                    s.vy = lerp(s.vy, s.y, 0.12);
+                    s.va = lerpAngle(s.va, s.angle, 0.12);
+                    s.pulse += 0.08;
+                };
+
+                this.playerShips.forEach(process);
+                this.enemyShips.forEach(process);
+
+                for (let i = this.effects.length - 1; i >= 0; i--) {
+                    const f = this.effects[i];
+                    if (f.type === 'missile') {
+                        f.progress += 0.06;
+                        if (f.progress >= 1) {
+                            f.onHit();
+                            this.effects.splice(i, 1);
+                        }
+                    }
+                }
+            }
+
+            drawCraft(ship, color, isPlayer) {
+                if (ship.hp <= 0) return;
+                const px = ship.vx * GRID_SIZE + GRID_SIZE/2;
+                const py = ship.vy * GRID_SIZE + GRID_SIZE/2;
+
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(ship.va * Math.PI / 180);
+
+                ctx.fillStyle = isPlayer ? `rgba(0, 255, 255, ${0.4 + Math.sin(ship.pulse) * 0.2})` : `rgba(255, 0, 255, ${0.4 + Math.sin(ship.pulse) * 0.2})`;
+                ctx.fillRect(-3, 12, 6, 8);
+
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = color;
+                ctx.fillStyle = color;
+
+                ctx.beginPath();
+                ctx.moveTo(0, -20);
+                ctx.lineTo(18, 14);
+                ctx.lineTo(0, 4);
+                ctx.lineTo(-18, 14);
+                ctx.closePath();
+                ctx.fill();
+
+                if (ship.shield) {
+                    const sPulse = Math.sin(ship.pulse * 2.5) * 3;
+                    ctx.strokeStyle = isPlayer ? '#00ffff' : '#ff00ff';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 3]);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 26 + sPulse, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                ctx.restore();
+            }
+
+            render() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = '#1a1a1a';
+                ctx.lineWidth = 1;
+                for(let i=0; i<=COLS; i++) {
+                    ctx.beginPath(); ctx.moveTo(i*GRID_SIZE, 0); ctx.lineTo(i*GRID_SIZE, canvas.height); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0, i*GRID_SIZE); ctx.lineTo(canvas.width, i*GRID_SIZE); ctx.stroke();
+                }
+
+                const sel = this.playerShips[this.selectedShipIndex];
+                if (this.turnState === 'PLAYER' && sel.hp > 0) {
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)';
+                    ctx.strokeRect(sel.vx * GRID_SIZE + 1, sel.vy * GRID_SIZE + 1, GRID_SIZE - 2, GRID_SIZE - 2);
+                    
+                    const rad = (sel.angle - 90) * (Math.PI / 180);
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
+                    ctx.moveTo(sel.vx * GRID_SIZE + 25, sel.vy * GRID_SIZE + 25);
+                    ctx.lineTo((sel.vx + Math.cos(rad) * 10) * GRID_SIZE + 25, (sel.vy + Math.sin(rad) * 10) * GRID_SIZE + 25);
+                    ctx.stroke();
+                }
+
+                this.playerShips.forEach(s => this.drawCraft(s, '#00ff00', true));
+                this.enemyShips.forEach(s => this.drawCraft(s, '#ff00ff', false));
+
+                this.effects.forEach(f => {
+                    if (f.type === 'missile') {
+                        const mx = (f.x + (f.tx - f.x) * f.progress) * GRID_SIZE + 25;
+                        const my = (f.y + (f.ty - f.y) * f.progress) * GRID_SIZE + 25;
+                        ctx.fillStyle = f.color;
+                        ctx.shadowBlur = 12;
+                        ctx.shadowColor = f.color;
+                        ctx.beginPath();
+                        ctx.arc(mx, my, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    }
+                });
+
+                if (this.playerShips.every(s => s.hp <= 0)) {
+                    this.drawOverlay("SQUAD WIPED", "#ff3333");
+                } else if (this.enemyShips.every(s => s.hp <= 0)) {
+                    this.drawOverlay("VICTORY", "#00ff00");
+                }
+            }
+            
+            drawOverlay(text, color) {
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.fillRect(0,0,canvas.width, canvas.height);
+                ctx.fillStyle = color;
+                ctx.textAlign = 'center';
+                ctx.font = '24px "Press Start 2P"';
+                ctx.fillText(text, canvas.width/2, canvas.height/2);
+            }
+        }
+
+        const game = new Game();
+    </script>
+</body>
+</html>
