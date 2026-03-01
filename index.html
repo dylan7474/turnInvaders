@@ -697,6 +697,7 @@
             drawCraft(ship, color, isPlayer) {
                 if (ship.hp <= 0) return;
                 const px = ship.vx * GRID_SIZE + 25, py = ship.vy * GRID_SIZE + 25;
+                const callsignLetter = ship.name.charAt(0);
                 ctx.save(); ctx.translate(px, py); ctx.rotate(ship.va * Math.PI / 180);
                 ctx.fillStyle = isPlayer ? `rgba(0, 255, 255, 0.4)` : `rgba(255, 0, 255, 0.4)`; ctx.fillRect(-3, 14, 6, 10);
                 ctx.shadowBlur = 12; ctx.shadowColor = color; ctx.fillStyle = color;
@@ -711,7 +712,6 @@
                     ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.arc(0, 0, 28 + Math.sin(ship.pulse*3)*4, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
                 }
                 if (isPlayer) {
-                    const callsignLetter = ship.name.charAt(0);
                     ctx.fillStyle = '#001100';
                     ctx.fillRect(-8, -6, 16, 12);
                     ctx.fillStyle = '#ffffff';
@@ -721,7 +721,6 @@
                 }
                 ctx.restore();
                 ctx.fillStyle = color; ctx.font = '6px "Press Start 2P"'; ctx.textAlign = 'center';
-                if (isPlayer) ctx.fillText(ship.name, px, py - 30);
                 ctx.fillText(ship.shield ? `S:${"|".repeat(ship.shieldHp)}` : 'HULL OK', px, py + 40);
             }
 
