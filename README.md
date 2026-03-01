@@ -34,7 +34,7 @@ No build step is required.
 
 ## HUD and craft identification
 
-- Your squad ships are explicitly marked as **ALPHA**, **BRAVO**, and **CHARLIE** on both the ship tabs and directly on the battlefield.
+- Your squad ships are shown as **ALPHA**, **BRAVO**, and **CHARLIE** in the ship tabs, while each craft itself carries the compact callsign marker: **A**, **B**, and **C**.
 - The active ship panel now shows a **HULL** readout. **HULL** means the craft's core frame integrity (whether the ship is still operational).
 - Shield bars (`SHIELD`) are separate from HULL and represent temporary protection that can be toggled and repaired.
 
