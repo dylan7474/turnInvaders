@@ -32,6 +32,12 @@ No build step is required.
 - Click ship tabs (`ALPHA`, `BRAVO`, `CHARLIE`) to switch active ship.
 - Click action buttons to execute abilities, including **FIELD REPAIR**.
 
+## HUD and craft identification
+
+- Your squad ships are explicitly marked as **ALPHA**, **BRAVO**, and **CHARLIE** on both the ship tabs and directly on the battlefield.
+- The active ship panel now shows a **HULL** readout. **HULL** means the craft's core frame integrity (whether the ship is still operational).
+- Shield bars (`SHIELD`) are separate from HULL and represent temporary protection that can be toggled and repaired.
+
 ## Short roadmap
 
 - Add win/lose screens and sector progression summary.

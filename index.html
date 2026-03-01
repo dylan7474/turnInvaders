@@ -447,7 +447,7 @@
                 this.playerShips.forEach((s, i) => {
                     const tab = document.createElement('div');
                     tab.className = `ship-tab ${this.selectedShipIndex === i ? 'active' : ''} ${s.hp <= 0 ? 'opacity-30' : ''}`;
-                    tab.textContent = s.name;
+                    tab.textContent = `${i + 1}: ${s.name}`;
                     tab.onclick = () => this.selectShip(i);
                     selector.appendChild(tab);
                 });
@@ -455,7 +455,10 @@
                 const active = this.playerShips[this.selectedShipIndex];
                 if (active) {
                     const shieldIntegrity = active.hp > 0 ? `${"|".repeat(active.shieldHp)}${".".repeat(active.maxShieldHp - active.shieldHp)}` : "OFFLINE";
+                    const hullStatus = active.hp > 0 ? 'OPERATIONAL' : 'BREACHED';
                     document.getElementById('active-ship-stats').innerHTML = `
+                        CRAFT: ${active.name}<br>
+                        HULL: <span style="color:${active.hp > 0 ? '#00ff00' : '#ff3333'}">${hullStatus}</span> <span style="color:#777">(core frame integrity)</span><br>
                         SHIELD: [${shieldIntegrity}] <br>
                         PWR: <span style="color:${active.shield ? '#00ffff' : '#ff3333'}">${active.shield ? 'ACTIVE' : 'READY'}</span>
                     `;
@@ -707,9 +710,19 @@
                     ctx.strokeStyle = isPlayer ? `rgba(0, 255, 255, ${intensity})` : `rgba(255, 0, 255, ${intensity})`;
                     ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.arc(0, 0, 28 + Math.sin(ship.pulse*3)*4, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
                 }
+                if (isPlayer) {
+                    const callsignLetter = ship.name.charAt(0);
+                    ctx.fillStyle = '#001100';
+                    ctx.fillRect(-8, -6, 16, 12);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '8px "Press Start 2P"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(callsignLetter, 0, 3);
+                }
                 ctx.restore();
                 ctx.fillStyle = color; ctx.font = '6px "Press Start 2P"'; ctx.textAlign = 'center';
-                ctx.fillText(ship.shield ? `S:${"|".repeat(ship.shieldHp)}` : 'HULL', px, py + 40);
+                if (isPlayer) ctx.fillText(ship.name, px, py - 30);
+                ctx.fillText(ship.shield ? `S:${"|".repeat(ship.shieldHp)}` : 'HULL OK', px, py + 40);
             }
 
             render() {
